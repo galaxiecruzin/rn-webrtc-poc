@@ -11,12 +11,14 @@ import type { Node } from 'react';
 import { Provider } from 'react-redux';
 import store from './redux/store';
 import MainNavigation from './components/MainNavigation';
+import { VideoCallScreen } from './screens/VideoCallScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const App: () => Node = () => (
     <Provider store={store}>
       <SafeAreaProvider>
-        <MainNavigation />  
+        <MainNavigation />
+        <VideoCallScreen />
       </SafeAreaProvider>
     </Provider>
 );

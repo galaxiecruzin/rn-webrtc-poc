@@ -63,7 +63,7 @@ Use this command to generate an mp4 file, pressing ctrl-c to end
 
 ```
 ffmpeg -re -f lavfi -i "smptehdbars=rate=30:size=640x480" \
--f lavfi -i "sine=frequency=1000:sample_rate=48000" \
+-f lavfi -i "sine=frequency=1000:sample_rate=44100" \
 -vf drawtext="text='YOUR MESSAGE %{localtime\:%X}':rate=30:x=(w-tw)/2:y=(h-lh)/2:fontsize=48:fontcolor=white:box=1:boxcolor=black" \
 -f flv -c:v h264 -profile:v baseline -pix_fmt yuv420p -preset ultrafast -tune zerolatency -crf 28 -g 60 -c:a aac \
  output.mp4
@@ -74,7 +74,7 @@ ffmpeg -re -f lavfi -i "smptehdbars=rate=30:size=640x480" \
 ```
 ffmpeg -re -stream_loop -1 -i ./output.mp4 -s 426x240 -c:v libx264 -profile:v \
  baseline -b:v 1M -r 24 -g 60 \
- -c:a libopus -b:a 96K -ar 48000 \
+ -c:a libopus -b:a 96K -ar 44100 \
  -an -f rtp rtp://janus.4devz.com:5004 \
  -vn -f rtp rtp://janus.4devz.com:5002
 ```
@@ -84,6 +84,14 @@ ffmpeg -re -stream_loop -1 -i ./output.mp4 -s 426x240 -c:v libx264 -profile:v \
 __Test with Streaming Demo "External h264 source (live)"__
 
 ```
+# Video Only
+ffmpeg -re -stream_loop -1 -i ./output2.mp4 -s 426x240 -c:v libx264 -profile:v \
+ baseline -b:v 1M -r 24 -g 60 \
+ -an -f rtp rtp://janus.4devz.com:5004
+```
+
+```
+# Video and audio stream ( audio is currently distorted for some reason )
 ffmpeg -rtsp_transport tcp -i rtsp://user:password@192.168.0.81:554 \
   -vcodec copy -an -f rtp rtp://janus.4devz.com:5004 \
   -vn -acodec copy -f rtp rtp://janus.4devz.com:5002

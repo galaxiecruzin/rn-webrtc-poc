@@ -4,17 +4,19 @@ import {
   Text,
   View,
 } from 'react-native';
+import { PrimaryButton } from '../components/Button'
+
 
 export const LandingScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
-      <Text
+      {/* <Text
         numberOfLines={1}
         adjustsFontSizeToFit
         style={styles.headerText}
       >
-        Hello World
-      </Text>
+        Welcome
+      </Text> */}
     </View>
   );
 }
