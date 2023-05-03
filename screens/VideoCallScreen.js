@@ -35,111 +35,77 @@ import Janus from '../lib/janus';
 
 
 export const VideoCallScreen = () => {
-    // local stream
-    const [stream, setStream] = useState(null);
-
-    useEffect(() => {
-        let peerConstraints = {
-            iceServers: [
-                {
-                    urls: 'stun:stun.l.google.com:19302'
-                }
-            ]
-        };
-        
-        let peerConnection = new RTCPeerConnection( peerConstraints );
-        
-        peerConnection.addEventListener( 'connectionstatechange', event => {
-            switch( peerConnection.connectionState ) {
-                case 'closed':
-                    // You can handle the call being disconnected here.
-                    break;
-            };
-        } );
-        
-        peerConnection.addEventListener( 'icecandidate', event => {
-            // When you find a null candidate then there are no more candidates.
-            // Gathering of candidates has finished.
-            if ( !event.candidate ) { return; };
-        
-            // Send the event.candidate onto the person you're calling.
-            // Keeping to Trickle ICE Standards, you should send the candidates immediately.
-        } );
-        
-        peerConnection.addEventListener( 'icecandidateerror', event => {
-            // You can ignore some candidate errors.
-            // Connections can still be made even when errors occur.
-        } );
-        
-        peerConnection.addEventListener( 'iceconnectionstatechange', event => {
-            switch( peerConnection.iceConnectionState ) {
-                case 'connected':
-                case 'completed':
-                    // You can handle the call being connected here.
-                    // Like setting the video streams to visible.
-                    break;
-            };
-        } );
-        
-        peerConnection.addEventListener( 'negotiationneeded', event => {
-            // You can start the offer stages here.
-            // Be careful as this event can be called multiple times.
-        } );
-        
-        peerConnection.addEventListener( 'signalingstatechange', event => {
-            switch( peerConnection.signalingState ) {
-                case 'closed':
-                    // You can handle the call being disconnected here.
-        
-                    break;
-            };
-        } );
-        
-        peerConnection.addEventListener( 'track', event => {
-            // Grab the remote track from the connected participant.
-            remoteMediaStream = remoteMediaStream || new MediaStream();
-            remoteMediaStream.addTrack( event.track, remoteMediaStream );
-        } );
-        
-        // Add our stream to the peer connection.
-        // localMediaStream.getTracks().forEach( 
-        //     track => peerConnection.addTrack( track, localMediaStream );
-        // );
-    }); 
+  const [stream, setStream] = useState(null);
+  const [streaming, setStreaming] = useState();
 
   const start = async () => {
       console.log('start');
       if (!stream) {
-        let connection;
         try {
           Janus.init({
             debug: "all",
             callback: () => {
               self.janus = new Janus({
-                server: 'https://janus.4devz.com:8089/janus',
+                server: ['wss://janus.4devz.com:8188/', 'https://janus.4devz.com:8089/janus'],
                 success: () => {
-                  console.log("Janus.init complete.")
-                }
-              });
-              // self.janus.attach({
-              //   onmessage: function(msg, jsep) {
-              //   Janus.debug(" ::: Got a message (listener) :::");
-              //   Janus.debug(JSON.stringify(msg));
-              //   }
-              // });
-              self.janus.attach({
-                plugin: "janus.plugin.streaming",
-                // stream: undefined,
-                opaqueId: 'streamingtest-BUwO26IIZ3Os',
-                success: function(pluginHandle) {
-                  console.log("Plugin attached! (" + pluginHandle.getPlugin() + ", id=" + pluginHandle.getId() + ")");
-                  // pluginHandle.send({"message": {}});
-                }
+                  console.log("Janus.init complete.");
+                  self.janus.attach({
+                    plugin: "janus.plugin.streaming",
+                    // stream: undefined,
+                    opaqueId: 'streamingtest-BUwO26IIZ3Os',
+                    success: function(pluginHandle) {
+                      setStreaming(pluginHandle);
+                      console.log("Plugin attached! (" + pluginHandle.getPlugin() + ", id=" + pluginHandle.getId() + ")");
+                      // Get list of streams
+                      pluginHandle.send({ message: { request: "list" }, 
+                        success: (result) => {
+                          console.log("pluginHandle.send -> result:", result);
+                          // Tell server we want to watch
+                          pluginHandle.send({ message: { request: "watch", id: 99} });
+                        }
+                      });
+                    },
+                    onmessage: (message, jsep) => {
+                      console.log("onmessage()...", message);
+                      if (message.error) {
+                        console.log("onmessage() -> error:", message);
+                        return;
+                      }
+                      if (jsep) {
+                        console.log("onmessage()...if jsep true");
+                        // create answer
+                        let stereo = (jsep.sdp.indexOf("stereo=1") !== -1);
+                        console.log("onmessage()...createAnswer");
+                        streaming.createAnswer({
+                          jsep: jsep,
+                          tracks: [
+                            { type: 'data' }
+                          ],
+                          customizeSdp: function(jsep) {
+                            console.log("onmessage() -> customizeSdp()");
+                            if(stereo && jsep.sdp.indexOf("stereo=1") == -1) {
+                              // Make sure that our offer contains stereo too
+                              jsep.sdp = jsep.sdp.replace("useinbandfec=1", "useinbandfec=1;stereo=1");
+                            }
+                          },
+                          success: function(jsep) {
+                            Janus.debug("onmessage() -> Got SDP!", jsep);
+                            let body = { request: "start" };
+                            streaming.send({ message: body, jsep: jsep });
+                            //$('#watch').html("Stop").removeAttr('disabled').unbind('click').click(stopStream);
+                          },
+                          error: function(error) {
+                            Janus.error("onmessage() -> WebRTC error:", error);
+                            //bootbox.alert("WebRTC error... " + error.message);
+                          }
+                        });
+                      }
+                    }
+                  });
+                },
               });
             }
           });
-          // let s = await mediaDevices.getUserMedia({ video: true });
-          // setStream(s);
         } catch(e) {
             console.error(e);
         }
