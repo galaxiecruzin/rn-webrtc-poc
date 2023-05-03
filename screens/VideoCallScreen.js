@@ -52,7 +52,7 @@ export const VideoCallScreen = () => {
                   self.janus.attach({
                     plugin: "janus.plugin.streaming",
                     // stream: undefined,
-                    opaqueId: 'streamingtest-BUwO26IIZ3Os',
+                    opaqueId: 'streamingtest-z4yYO366Y7oP',
                     success: function(pluginHandle) {
                       setStreaming(pluginHandle);
                       console.log("Plugin attached! (" + pluginHandle.getPlugin() + ", id=" + pluginHandle.getId() + ")");
@@ -81,17 +81,10 @@ export const VideoCallScreen = () => {
                           tracks: [
                             { type: 'data' }
                           ],
-                          customizeSdp: function(jsep) {
-                            console.log("onmessage() -> customizeSdp()");
-                            if(stereo && jsep.sdp.indexOf("stereo=1") == -1) {
-                              // Make sure that our offer contains stereo too
-                              jsep.sdp = jsep.sdp.replace("useinbandfec=1", "useinbandfec=1;stereo=1");
-                            }
-                          },
-                          success: function(jsep) {
-                            Janus.debug("onmessage() -> Got SDP!", jsep);
+                          success: function(ourjsep) {
+                            Janus.debug("onmessage() -> Got SDP!", ourjsep);
                             let body = { request: "start" };
-                            streaming.send({ message: body, jsep: jsep });
+                            streaming.send({ message: body, jsep: ourjsep });
                             //$('#watch').html("Stop").removeAttr('disabled').unbind('click').click(stopStream);
                           },
                           error: function(error) {
@@ -100,7 +93,18 @@ export const VideoCallScreen = () => {
                           }
                         });
                       }
-                    }
+                    },
+                    onlocaltrack: function(track, added) {
+                      // This will NOT be invoked, we chose recvonly
+                    },
+                    onremotetrack: function(track, mid, added, metadata) {
+                        // Invoked after send has got us a PeerConnection
+                        // This is info on a remote track: when added, we can choose to render
+                        // This is info on a remote track: when added, we can choose to render
+                        // You can query metadata to get some more information on why track was added or removed
+                        // metadata fields:
+                        //   - reason: 'created' | 'ended' | 'mute' | 'unmute'
+                    },
                   });
                 },
               });
