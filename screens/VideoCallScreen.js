@@ -1,22 +1,16 @@
 import React, {useEffect, useState} from 'react';
-import {
-  Button,
-  StyleSheet,
-  SafeAreaView,
-  View,
-} from 'react-native';
+import {Button, StyleSheet, SafeAreaView, Text, View} from 'react-native';
 
 import WebRTC, {
-    RTCPeerConnection,
-    RTCIceCandidate,
-    RTCSessionDescription,
-    RTCView,
-    MediaStream,
-    MediaStreamTrack,
-    getUserMedia,
-  } from 'react-native-webrtc';
+  RTCPeerConnection,
+  RTCIceCandidate,
+  RTCSessionDescription,
+  RTCView,
+  MediaStream,
+  MediaStreamTrack,
+  getUserMedia,
+} from 'react-native-webrtc';
 
-// import janusClient from '../lib/JanusClient';
 import Janus from '../lib/janus';
 
 /**
@@ -33,135 +27,343 @@ import Janus from '../lib/janus';
     release(releaseTracks?: boolean): void; 
  */
 
+var janus = null;
+const server = 'https://janus.4devz.com:8089/janus'; // 'wss://janus.4devz.com:8188/',
+const iceServers = 'stun.l.google.com:19302';
+/**
+  'stun1.l.google.com:19302',
+  'stun2.l.google.com:19302',
+  'stun3.l.google.com:19302',
+  'stun4.l.google.com:19302',
+];
+*/
+let streaming = null;
 
 export const VideoCallScreen = () => {
+  const selectedStream = 99;
+  const [opaqueId, setOpaqueId] = useState(null);
   const [stream, setStream] = useState(null);
-  const [streaming, setStreaming] = useState();
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [janusInit, setJanusInit] = useState(null);
+  const [streamsList, setStreamsList] = useState(null);
 
-  const start = async () => {
-      console.log('start');
-      if (!stream) {
-        try {
-          Janus.init({
-            debug: "all",
-            callback: () => {
-              self.janus = new Janus({
-                server: ['wss://janus.4devz.com:8188/', 'https://janus.4devz.com:8089/janus'],
-                success: () => {
-                  console.log("Janus.init complete.");
-                  self.janus.attach({
-                    plugin: "janus.plugin.streaming",
-                    // stream: undefined,
-                    opaqueId: 'streamingtest-z4yYO366Y7oP',
-                    success: function(pluginHandle) {
-                      setStreaming(pluginHandle);
-                      console.log("Plugin attached! (" + pluginHandle.getPlugin() + ", id=" + pluginHandle.getId() + ")");
-                      // Get list of streams
-                      pluginHandle.send({ message: { request: "list" }, 
-                        success: (result) => {
-                          console.log("pluginHandle.send -> result:", result);
-                          // Tell server we want to watch
-                          pluginHandle.send({ message: { request: "watch", id: 99} });
-                        }
-                      });
-                    },
-                    onmessage: (message, jsep) => {
-                      console.log("onmessage()...", message);
-                      if (message.error) {
-                        console.log("onmessage() -> error:", message);
-                        return;
-                      }
-                      if (jsep) {
-                        console.log("onmessage()...if jsep true");
-                        // create answer
-                        let stereo = (jsep.sdp.indexOf("stereo=1") !== -1);
-                        console.log("onmessage()...createAnswer");
-                        streaming.createAnswer({
-                          jsep: jsep,
-                          tracks: [
-                            { type: 'data' }
-                          ],
-                          success: function(ourjsep) {
-                            Janus.debug("onmessage() -> Got SDP!", ourjsep);
-                            let body = { request: "start" };
-                            streaming.send({ message: body, jsep: ourjsep });
-                            //$('#watch').html("Stop").removeAttr('disabled').unbind('click').click(stopStream);
-                          },
-                          error: function(error) {
-                            Janus.error("onmessage() -> WebRTC error:", error);
-                            //bootbox.alert("WebRTC error... " + error.message);
-                          }
-                        });
-                      }
-                    },
-                    onlocaltrack: function(track, added) {
-                      // This will NOT be invoked, we chose recvonly
-                    },
-                    onremotetrack: function(track, mid, added, metadata) {
-                        // Invoked after send has got us a PeerConnection
-                        // This is info on a remote track: when added, we can choose to render
-                        // This is info on a remote track: when added, we can choose to render
-                        // You can query metadata to get some more information on why track was added or removed
-                        // metadata fields:
-                        //   - reason: 'created' | 'ended' | 'mute' | 'unmute'
-                    },
-                  });
-                },
-              });
+  const updateStreamsList = () => {
+    // if streaming
+    streaming.send({
+      message: {request: 'list'},
+      success: result => {
+        // console.log('pluginHandle.send -> result:', result);
+        _streamsList = {};
+        if (result['list'] && Array.isArray(result['list'])) {
+          let list = result['list'];
+          for (let mp in list) {
+            Janus.debug(
+              '  >> [' +
+                list[mp]['id'] +
+                '] ' +
+                list[mp]['description'] +
+                ' (' +
+                list[mp]['type'] +
+                ')',
+            );
+            // Check the nature of the available streams, and if there are some multistream ones
+            list[mp].legacy = true;
+            if (list[mp].media) {
+              let audios = 0,
+                videos = 0;
+              for (let mi in list[mp].media) {
+                if (!list[mp].media[mi]) continue;
+                if (list[mp].media[mi].type === 'audio') audios++;
+                else if (list[mp].media[mi].type === 'video') videos++;
+                if (audios > 1 || videos > 1) {
+                  list[mp].legacy = false;
+                  break;
+                }
+              }
             }
-          });
-        } catch(e) {
-            console.error(e);
+            // Keep track of all the available streams
+            _streamsList[list[mp]['id']] = list[mp];
+            setStreamsList(_streamsList);
+            // console.log('streamsList', _streamsList);
+          }
         }
-      }
+      },
+    });
   };
 
-  const stop = () => {
-        console.log('stop');
-        if (stream) {
-          stream.release();
-          setStream(null);
-        }
+  const getStreamInfo = () => {
+    // console.log('getStreamInfo()');
+    // if(!selectedStream || !streamsList[selectedStream])
+    //     return;
+    // Send a request for more info on the mountpoint we subscribed to
+    let body = {
+      request: 'info',
+      id: parseInt(selectedStream) || selectedStream,
+    };
+    streaming.send({
+      message: body,
+      success: function (result) {
+        console.log('getStreamInfo()', result);
+        setStream(result);
+      },
+    });
   };
+
+  const startStream = () => {
+    // Tell server we want to watch
+    console.log('startStream()');
+    if (streaming) {
+      streaming.send({message: {request: 'watch', id: selectedStream}});
+      getStreamInfo();
+    }
+  };
+
+  const init = async () => {
+    let _opaqueId = 'streamingtest-' + Janus.randomString(12);
+    setOpaqueId(_opaqueId);
+    console.log('init() ... ');
+    if (!stream) {
+      try {
+        Janus.init({
+          debug: 'all',
+          callback: () => {
+            janus = new Janus({
+              server: server,
+              iceServers: iceServers,
+              success: () => {
+                console.log('Janus.init complete.');
+                setJanusInit(true);
+                janus.attach({
+                  plugin: 'janus.plugin.streaming',
+                  opaqueId: _opaqueId,
+                  success: function (pluginHandle) {
+                    streaming = pluginHandle;
+                    console.log(
+                      'Plugin attached! (' +
+                        pluginHandle.getPlugin() +
+                        ', id=' +
+                        pluginHandle.getId() +
+                        ')',
+                    );
+                    // Get list of streams
+                    updateStreamsList();
+                  },
+                  error: function (error) {
+                    console.error('  -- Error attaching plugin... ', error);
+                  },
+                  iceState: function (state) {
+                    console.log('ICE state changed to ' + state);
+                  },
+                  webrtcState: function (on) {
+                    console.log(
+                      'Janus says our WebRTC PeerConnection is ' +
+                        (on ? 'up' : 'down') +
+                        ' now',
+                    );
+                  },
+                  slowLink: function (uplink, lost, mid) {
+                    console.warn(
+                      'Janus reports problems ' +
+                        (uplink ? 'sending' : 'receiving') +
+                        ' packets on mid ' +
+                        mid +
+                        ' (' +
+                        lost +
+                        ' lost packets)',
+                    );
+                  },
+                  onmessage: function (msg, jsep) {
+                    console.log(' ::: Got a message :::', msg);
+                    let result = msg['result'];
+                    if (result) {
+                      if (result['status']) {
+                        let status = result['status'];
+                        if (status === 'starting')
+                          console.log('Starting, please wait...');
+                        else if (status === 'started') console.log('Started');
+                        else if (status === 'stopped') stopStream();
+                      } else if (msg['streaming'] === 'event') {
+                        // Does this event refer to a mid in particular?
+                        // let mid = result["mid"] ? result["mid"] : "0";
+                        // Is simulcast in place?
+                        // let substream = result["substream"];
+                        // let temporal = result["temporal"];
+                        // if((substream !== null && substream !== undefined) || (temporal !== null && temporal !== undefined)) {
+                        //     if(!simulcastStarted[mid]) {
+                        //         simulcastStarted[mid] = true;
+                        //         addSimulcastButtons(mid);
+                        //     }
+                        //     // We just received notice that there's been a switch, update the buttons
+                        //     updateSimulcastButtons(mid, substream, temporal);
+                        // }
+                        // Is VP9/SVC in place?
+                        // let spatial = result["spatial_layer"];
+                        // temporal = result["temporal_layer"];
+                        // if((spatial !== null && spatial !== undefined) || (temporal !== null && temporal !== undefined)) {
+                        //     if(!svcStarted[mid]) {
+                        //         svcStarted[mid] = true;
+                        //         addSvcButtons(mid);
+                        //     }
+                        //     // We just received notice that there's been a switch, update the buttons
+                        //     updateSvcButtons(mid, spatial, temporal);
+                        // }
+                      }
+                    } else if (msg['error']) {
+                      console.log(msg['error']);
+                      return;
+                    }
+                    if (jsep) {
+                      console.log('Handling SDP as well...', jsep);
+                      let stereo = jsep.sdp.indexOf('stereo=1') !== -1;
+                      // Offer from the plugin, let's answer
+                      streaming.createAnswer({
+                        jsep: jsep,
+                        // We only specify data channels here, as this way in
+                        // case they were offered we'll enable them. Since we
+                        // don't mention audio or video tracks, we autoaccept them
+                        // as recvonly (since we won't capture anything ourselves)
+                        tracks: [{type: 'data'}],
+                        // customizeSdp: function (jsep) {
+                        //   if (stereo && jsep.sdp.indexOf('stereo=1') == -1) {
+                        //     // Make sure that our offer contains stereo too
+                        //     jsep.sdp = jsep.sdp.replace(
+                        //       'useinbandfec=1',
+                        //       'useinbandfec=1;stereo=1',
+                        //     );
+                        //   }
+                        // },
+                        success: function (jsep) {
+                          Janus.debug('Got SDP!', jsep);
+                          let body = {request: 'start'};
+                          streaming.send({message: body, jsep: jsep});
+                          // $('#watch').html("Stop").removeAttr('disabled').unbind('click').click(stopStream);
+                        },
+                        error: function (error) {
+                          console.log('WebRTC error:', error);
+                          // bootbox.alert("WebRTC error... " + error.message);
+                        },
+                      });
+                    }
+                  },
+                  onremotetrack: function (track, mid, on, metadata) {
+                    console.log(
+                      'Remote track (mid=' +
+                        mid +
+                        ') ' +
+                        (on ? 'added' : 'removed') +
+                        (metadata ? ' (' + metadata.reason + ') ' : '') +
+                        ':',
+                      track,
+                    );
+                    // TODO ------------------------------------------------
+                    // When stream is received do something with it, such as,
+                    // setRemoteStream();
+                    // or add all tracks to an array of tracks
+                    // TODO ------------------------------------------------
+                  },
+                  ondataopen: function (label, protocol) {
+                    console.log(
+                      'The DataChannel is available!',
+                      label,
+                      protocol,
+                    );
+                  },
+                  ondata: function (data) {
+                    console.log('We got data from the DataChannel!', data);
+                  },
+                  oncleanup: function () {
+                    console.log(' ::: Got a cleanup notification :::');
+                  },
+                });
+              },
+              error: function (error) {
+                console.error(error);
+              },
+              destroyed: function () {
+                // window.location.reload(); // TODO
+              },
+            });
+          },
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
+  const stopStream = () => {
+    console.log('stop');
+    let body = {request: 'stop'};
+    if (streaming) {
+      streaming.send({message: body});
+      streaming.hangup();
+    }
+    streaming = null;
+    setStream(null);
+  };
+
+  useEffect(() => {
+    // init();
+    console.log('Ready to init.');
+  }, []);
+
+  const renderStream = () => {
+    console.log("reanderStream() ");
+    if (remoteStream) {
+      // const keys = Object.keys(stream);
+      console.log("renderStream -> remoteStream", JSON.stringify(remoteStream));
+      // // <RTCView streamURL={url} style={styles.stream} />
+      return (
+        <>
+          <Text>The Stream</Text>
+        </>
+      );
+      /**
+       *
+          {streamsList.map((stream) => (
+            <Text>{stream.description}</Text>
+          ))}
+       */
+    } else {
+      return (
+        <Text>No Video</Text>
+      );
+    }
+  }
 
   return (
     <SafeAreaView style={styles.body}>
-        {
-        stream &&
-          <RTCView
-            streamURL={stream.toURL()}
-            style={styles.stream} />
+      {renderStream()}
+      <View style={styles.footer}>
+        {!janusInit &&
+          <Button title="Init" onPress={init} />
         }
-        <View
-          style={styles.footer}>
-          <Button
-            title = "Start"
-            onPress = {start} />
-          <Button
-            title = "Stop"
-            onPress = {stop} />
-        </View>
+        {janusInit &&
+          <Button title="Start" onPress={startStream} />
+        }
+        <Button title="Stop" onPress={stopStream} />
+      </View>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   body: {
-    backgroundColor: "#fff",
-    ...StyleSheet.absoluteFill
+    backgroundColor: '#fff',
+    ...StyleSheet.absoluteFill,
   },
   headerText: {
     color: '#fff',
-    fontSize: 50
+    fontSize: 50,
   },
   stream: {
-    flex: 1
+    flex: 1,
   },
   footer: {
-    backgroundColor: "#ccc",
+    backgroundColor: '#ccc',
     position: 'absolute',
     bottom: 20,
     left: 0,
-    right: 0
+    right: 0,
   },
 });
