@@ -16,270 +16,270 @@ Janus.setDependencies({
 let janus;
 let streaming;
 
-// export const VideoCallScreen = () => {
-// //   const selectedStream = 99;
-// //   const [opaqueId, setOpaqueId] = useState(null);
-//   const [stream, setStream] = useState(null);
-//   const [publishers, setPublishers] = useState(null);
-// //   const [remoteStream, setRemoteStream] = useState(null);
-//   const [janusInit, setJanusInit] = useState(false);
-// //   const [streamsList, setStreamsList] = useState(null);
+export const VideoCallScreen = () => {
+//   const selectedStream = 99;
+//   const [opaqueId, setOpaqueId] = useState(null);
+  const [stream, setStream] = useState(null);
+  const [publishers, setPublishers] = useState(null);
+//   const [remoteStream, setRemoteStream] = useState(null);
+  const [janusInit, setJanusInit] = useState(false);
+//   const [streamsList, setStreamsList] = useState(null);
 
-// // class VideoCallScreen extends React.Component {
-//   // constructor(props) {
-//   //     super(props);
+// class VideoCallScreen extends React.Component {
+  // constructor(props) {
+  //     super(props);
 
-//   //     this.state = {
-//   //         stream: null,
-//   //         publishers: [],
-//   //     };
-//   // }
+  //     this.state = {
+  //         stream: null,
+  //         publishers: [],
+  //     };
+  // }
 
-//   const initJanus = async (stream) => {
-//       try {
-//         setPublishers({
-//             publishers: [
-//                 {
-//                     publisher: null,
-//                     stream: stream,
-//                 },
-//             ],
-//         });
-//         janus = new Janus('wss://janus.4devz.com:8989');
-//         // this.janus.setApiSecret('janusrocks');
-//         console.log('janus.init()...');
-//         await janus.init();
-//         console.log('new JanusStreamingPlugin(janus)');
-//         streaming = new JanusStreamingPlugin(janus);
-//         await streaming.createPeer();
-//         await streaming.connect();
-//       } catch (e) {
-//         console.error('initJanus', e);
-//       }
-//   }
-
-//   const getMediaStream = async () => {
-//     let isFront = true;
-//     let sourceInfos = await mediaDevices.enumerateDevices();
-//     let videoSourceId;
-//     for (let i = 0; i < sourceInfos.length; i++) {
-//         const sourceInfo = sourceInfos[i];
-//         console.log(sourceInfo);
-//         if (sourceInfo.kind == 'videoinput' && sourceInfo.facing == (isFront ? 'front' : 'environment')) {
-//             videoSourceId = sourceInfo.deviceId;
-//         }
-//     }
-
-//     let stream = await mediaDevices.getUserMedia({
-//         audio: true,
-//         video: {
-//             facingMode: (isFront ? 'user' : 'environment'),
-//         },
-//     });
-//     await initJanus(stream);
-//   };
-
-//   const watchStream = () => {
-//     try {
-//       if (streaming) {
-//         console.log('streaming.watch(99)', streaming);
-//         streaming.watch(99);
-//       }
-//       // if (streaming) streaming.send({request: 'watch', id: 99});
-//       // await updateStreamsList();
-//     } catch (e) {
-//       console.error('streaming.watch', e);
-//     }
-//   }
-
-//   const updateStreamsList = async () => {
-//     if (streaming) {
-//       console.log("updateStreamsList()");
-//       await streaming.send({request: 'list'});
-//     }
-//   }
-
-//   const stopStream = async () => {
-//       if (janus) {
-//           await janus.destroy();
-//       }
-//       janus = false;
-//       streaming = false;
-//   };
-
-//   return (
-//       <View style={{flex: 1, width: '100%', height: '100%', backgroundColor: '#000000', flexDirection: 'row'}}>
-//           <>
-//             <StatusBar translucent={true} barStyle={'light-content'}/>
-//             <Button title='Start' onPress={getMediaStream} />
-//             <Button title='Watch' onPress={watchStream} />
-//             <Button title='Stop' onPress={stopStream} />
-//           </>
-//           <FlatList
-//               data={publishers}
-//               numColumns={2}
-//               keyExtractor={(item, index) => {
-//                   if (item.publisher === null) {
-//                       return `rtc-default`;
-//                   }
-//                   return `rtc-${item.publisher.id}`;
-//               }}
-//               renderItem={({item}) => (
-//                   <RTCView style={{
-//                       flex: 1,
-//                       height: (Dimensions.get('window').height / 2),
-//                   }} objectFit={'cover'} streamURL={item.stream.toURL()}/>
-//               )}
-//           />
-//       </View>
-//   );
-// }
-
-class VideoCallScreen extends React.Component {
-  constructor(props) {
-      super(props);
-
-      this.state = {
-          stream: null,
-          publishers: [],
-      };
-  }
-
-  async receivePublisher(publisher) {
+  const initJanus = async (stream) => {
       try {
-          let videoRoom = new JanusVideoRoomPlugin(this.janus);
-          videoRoom.setRoomID(1234);
-          videoRoom.setOnStreamListener((stream) => {
-              this.setState(state => ({
-                  publishers: [
-                      ...state.publishers,
-                      {
-                          publisher: publisher,
-                          stream: stream,
-                      },
-                  ],
-              }));
-          });
-
-          await videoRoom.createPeer();
-          await videoRoom.connect();
-          await videoRoom.receive(this.videoRoom.getUserPrivateID(), publisher);
+        setPublishers({
+            publishers: [
+                {
+                    publisher: null,
+                    stream: stream,
+                },
+            ],
+        });
+        janus = new Janus('wss://janus.4devz.com:8989');
+        // this.janus.setApiSecret('janusrocks');
+        console.log('janus.init()...');
+        await janus.init();
+        console.log('new JanusStreamingPlugin(janus)');
+        streaming = new JanusStreamingPlugin(janus);
+        await streaming.createPeer();
+        await streaming.connect();
       } catch (e) {
-          console.error(e);
+        console.error('initJanus', e);
       }
   }
 
-  async removePublisher(publisherID) {
-      try {
-          this.setState(state => ({
-              publishers: state.publishers.filter(pub => pub.publisher == null || pub.publisher.id !== publisherID),
-          }));
-      } catch (e) {
-          console.error(e);
-      }
-  }
+  const getMediaStream = async () => {
+    let isFront = true;
+    let sourceInfos = await mediaDevices.enumerateDevices();
+    let videoSourceId;
+    for (let i = 0; i < sourceInfos.length; i++) {
+        const sourceInfo = sourceInfos[i];
+        console.log(sourceInfo);
+        if (sourceInfo.kind == 'videoinput' && sourceInfo.facing == (isFront ? 'front' : 'environment')) {
+            videoSourceId = sourceInfo.deviceId;
+        }
+    }
 
-  async initJanus(stream) {
-      try {
-          this.setState(state => ({
-              publishers: [
-                  {
-                      publisher: null,
-                      stream: stream,
-                  },
-              ],
-          }));
-
-          this.janus = new Janus('wss://janus.4devz.com:8989');
-          this.janus.setApiSecret('janusrocks');
-          await this.janus.init();
-
-          this.videoRoom = new JanusVideoRoomPlugin(this.janus);
-          this.videoRoom.setRoomID(1234);
-          this.videoRoom.setDisplayName('can');
-          this.videoRoom.setOnPublishersListener((publishers) => {
-              for (let i = 0; i < publishers.length; i++) {
-                  this.receivePublisher(publishers[i]);
-              }
-          });
-          this.videoRoom.setOnPublisherJoinedListener((publisher) => {
-              this.receivePublisher(publisher);
-          });
-          this.videoRoom.setOnPublisherLeftListener((publisherID) => {
-              this.removePublisher(publisherID);
-          });
-          this.videoRoom.setOnWebRTCUpListener(async () => {
-
-          });
-
-          await this.videoRoom.createPeer();
-          await this.videoRoom.connect();
-          await this.videoRoom.join();
-          // await this.videoRoom.publish(stream);
-
-      } catch (e) {
-          console.error('main', JSON.stringify(e));
-      }
-  }
-
-  getMediaStream = async () => {
-      let isFront = true;
-      let sourceInfos = await mediaDevices.enumerateDevices();
-      let videoSourceId;
-      for (let i = 0; i < sourceInfos.length; i++) {
-          const sourceInfo = sourceInfos[i];
-          console.log(sourceInfo);
-          if (sourceInfo.kind == 'videoinput' && sourceInfo.facing == (isFront ? 'front' : 'environment')) {
-              videoSourceId = sourceInfo.deviceId;
-          }
-      }
-
-      let stream = await mediaDevices.getUserMedia({
-          audio: true,
-          video: {
-              facingMode: (isFront ? 'user' : 'environment'),
-          },
-      });
-      await this.initJanus(stream);
+    let stream = await mediaDevices.getUserMedia({
+        audio: true,
+        video: {
+            facingMode: (isFront ? 'user' : 'environment'),
+        },
+    });
+    await initJanus(stream);
   };
 
-  async componentDidMount() {
-      this.getMediaStream();
+  const watchStream = () => {
+    try {
+      if (streaming) {
+        console.log('streaming.watch(99)', streaming);
+        streaming.watch(99);
+      }
+      // if (streaming) streaming.send({request: 'watch', id: 99});
+      // await updateStreamsList();
+    } catch (e) {
+      console.error('streaming.watch', e);
+    }
   }
 
-  componentWillUnmount = async () => {
-      if (this.janus) {
-          await this.janus.destroy();
+  const updateStreamsList = async () => {
+    if (streaming) {
+      console.log("updateStreamsList()");
+      await streaming.send({request: 'list'});
+    }
+  }
+
+  const stopStream = async () => {
+      if (janus) {
+          await janus.destroy();
       }
+      janus = false;
+      streaming = false;
   };
 
-  renderView() {
-  }
-
-  render() {
-      return (
-          <View style={{flex: 1, width: '100%', height: '100%', backgroundColor: '#000000', flexDirection: 'row'}}>
-              <StatusBar translucent={true} barStyle={'light-content'}/>
-              <FlatList
-                  data={this.state.publishers}
-                  numColumns={2}
-                  keyExtractor={(item, index) => {
-                      if (item.publisher === null) {
-                          return `rtc-default`;
-                      }
-                      return `rtc-${item.publisher.id}`;
-                  }}
-                  renderItem={({item}) => (
-                      <RTCView style={{
-                          flex: 1,
-                          height: (Dimensions.get('window').height / 2),
-                      }} objectFit={'cover'} streamURL={item.stream.toURL()}/>
-                  )}
-              />
-          </View>
-      );
-  }
+  return (
+      <View style={{flex: 1, width: '100%', height: '100%', backgroundColor: '#000000', flexDirection: 'row'}}>
+          <>
+            <StatusBar translucent={true} barStyle={'light-content'}/>
+            <Button title='Start' onPress={getMediaStream} />
+            <Button title='Watch' onPress={watchStream} />
+            <Button title='Stop' onPress={stopStream} />
+          </>
+          <FlatList
+              data={publishers}
+              numColumns={2}
+              keyExtractor={(item, index) => {
+                  if (item.publisher === null) {
+                      return `rtc-default`;
+                  }
+                  return `rtc-${item.publisher.id}`;
+              }}
+              renderItem={({item}) => (
+                  <RTCView style={{
+                      flex: 1,
+                      height: (Dimensions.get('window').height / 2),
+                  }} objectFit={'cover'} streamURL={item.stream.toURL()}/>
+              )}
+          />
+      </View>
+  );
 }
+
+// class VideoCallScreen extends React.Component {
+//   constructor(props) {
+//       super(props);
+
+//       this.state = {
+//           stream: null,
+//           publishers: [],
+//       };
+//   }
+
+//   async receivePublisher(publisher) {
+//       try {
+//           let videoRoom = new JanusVideoRoomPlugin(this.janus);
+//           videoRoom.setRoomID(1234);
+//           videoRoom.setOnStreamListener((stream) => {
+//               this.setState(state => ({
+//                   publishers: [
+//                       ...state.publishers,
+//                       {
+//                           publisher: publisher,
+//                           stream: stream,
+//                       },
+//                   ],
+//               }));
+//           });
+
+//           await videoRoom.createPeer();
+//           await videoRoom.connect();
+//           await videoRoom.receive(this.videoRoom.getUserPrivateID(), publisher);
+//       } catch (e) {
+//           console.error(e);
+//       }
+//   }
+
+//   async removePublisher(publisherID) {
+//       try {
+//           this.setState(state => ({
+//               publishers: state.publishers.filter(pub => pub.publisher == null || pub.publisher.id !== publisherID),
+//           }));
+//       } catch (e) {
+//           console.error(e);
+//       }
+//   }
+
+//   async initJanus(stream) {
+//       try {
+//           this.setState(state => ({
+//               publishers: [
+//                   {
+//                       publisher: null,
+//                       stream: stream,
+//                   },
+//               ],
+//           }));
+
+//           this.janus = new Janus('wss://janus.4devz.com:8989');
+//           this.janus.setApiSecret('janusrocks');
+//           await this.janus.init();
+
+//           this.videoRoom = new JanusVideoRoomPlugin(this.janus);
+//           this.videoRoom.setRoomID(1234);
+//           this.videoRoom.setDisplayName('can');
+//           this.videoRoom.setOnPublishersListener((publishers) => {
+//               for (let i = 0; i < publishers.length; i++) {
+//                   this.receivePublisher(publishers[i]);
+//               }
+//           });
+//           this.videoRoom.setOnPublisherJoinedListener((publisher) => {
+//               this.receivePublisher(publisher);
+//           });
+//           this.videoRoom.setOnPublisherLeftListener((publisherID) => {
+//               this.removePublisher(publisherID);
+//           });
+//           this.videoRoom.setOnWebRTCUpListener(async () => {
+
+//           });
+
+//           await this.videoRoom.createPeer();
+//           await this.videoRoom.connect();
+//           await this.videoRoom.join();
+//           // await this.videoRoom.publish(stream);
+
+//       } catch (e) {
+//           console.error('main', JSON.stringify(e));
+//       }
+//   }
+
+//   getMediaStream = async () => {
+//       let isFront = true;
+//       let sourceInfos = await mediaDevices.enumerateDevices();
+//       let videoSourceId;
+//       for (let i = 0; i < sourceInfos.length; i++) {
+//           const sourceInfo = sourceInfos[i];
+//           console.log(sourceInfo);
+//           if (sourceInfo.kind == 'videoinput' && sourceInfo.facing == (isFront ? 'front' : 'environment')) {
+//               videoSourceId = sourceInfo.deviceId;
+//           }
+//       }
+
+//       let stream = await mediaDevices.getUserMedia({
+//           audio: true,
+//           video: {
+//               facingMode: (isFront ? 'user' : 'environment'),
+//           },
+//       });
+//       await this.initJanus(stream);
+//   };
+
+//   async componentDidMount() {
+//       this.getMediaStream();
+//   }
+
+//   componentWillUnmount = async () => {
+//       if (this.janus) {
+//           await this.janus.destroy();
+//       }
+//   };
+
+//   renderView() {
+//   }
+
+//   render() {
+//       return (
+//           <View style={{flex: 1, width: '100%', height: '100%', backgroundColor: '#000000', flexDirection: 'row'}}>
+//               <StatusBar translucent={true} barStyle={'light-content'}/>
+//               <FlatList
+//                   data={this.state.publishers}
+//                   numColumns={2}
+//                   keyExtractor={(item, index) => {
+//                       if (item.publisher === null) {
+//                           return `rtc-default`;
+//                       }
+//                       return `rtc-${item.publisher.id}`;
+//                   }}
+//                   renderItem={({item}) => (
+//                       <RTCView style={{
+//                           flex: 1,
+//                           height: (Dimensions.get('window').height / 2),
+//                       }} objectFit={'cover'} streamURL={item.stream.toURL()}/>
+//                   )}
+//               />
+//           </View>
+//       );
+//   }
+// }
 
 export default VideoCallScreen;
 
