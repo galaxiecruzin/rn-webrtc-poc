@@ -1,8 +1,10 @@
+import React, {useEffect, useState} from 'react';
+import {Button, StyleSheet, SafeAreaView, Text, View, Dimensions, FlatList, StatusBar} from 'react-native';
 import {mediaDevices, MediaStream, RTCIceCandidate, RTCPeerConnection, RTCSessionDescription, RTCView} from 'react-native-webrtc';
-import React from 'react';
-import {Dimensions, FlatList, StatusBar, View} from 'react-native';
 import Janus from '../lib/Janus';
 import JanusStreamingPlugin from '../lib/plugins/streaming/JanusStreamingPlugin';
+import JanusVideoRoomPlugin from '../lib/plugins/videoroom/JanusVideoRoomPlugin';
+
 
 Janus.setDependencies({
   RTCPeerConnection,
@@ -10,6 +12,128 @@ Janus.setDependencies({
   RTCIceCandidate,
   MediaStream,
 });
+
+let janus;
+let streaming;
+
+// export const VideoCallScreen = () => {
+// //   const selectedStream = 99;
+// //   const [opaqueId, setOpaqueId] = useState(null);
+//   const [stream, setStream] = useState(null);
+//   const [publishers, setPublishers] = useState(null);
+// //   const [remoteStream, setRemoteStream] = useState(null);
+//   const [janusInit, setJanusInit] = useState(false);
+// //   const [streamsList, setStreamsList] = useState(null);
+
+// // class VideoCallScreen extends React.Component {
+//   // constructor(props) {
+//   //     super(props);
+
+//   //     this.state = {
+//   //         stream: null,
+//   //         publishers: [],
+//   //     };
+//   // }
+
+//   const initJanus = async (stream) => {
+//       try {
+//         setPublishers({
+//             publishers: [
+//                 {
+//                     publisher: null,
+//                     stream: stream,
+//                 },
+//             ],
+//         });
+//         janus = new Janus('wss://janus.4devz.com:8989');
+//         // this.janus.setApiSecret('janusrocks');
+//         console.log('janus.init()...');
+//         await janus.init();
+//         console.log('new JanusStreamingPlugin(janus)');
+//         streaming = new JanusStreamingPlugin(janus);
+//         await streaming.createPeer();
+//         await streaming.connect();
+//       } catch (e) {
+//         console.error('initJanus', e);
+//       }
+//   }
+
+//   const getMediaStream = async () => {
+//     let isFront = true;
+//     let sourceInfos = await mediaDevices.enumerateDevices();
+//     let videoSourceId;
+//     for (let i = 0; i < sourceInfos.length; i++) {
+//         const sourceInfo = sourceInfos[i];
+//         console.log(sourceInfo);
+//         if (sourceInfo.kind == 'videoinput' && sourceInfo.facing == (isFront ? 'front' : 'environment')) {
+//             videoSourceId = sourceInfo.deviceId;
+//         }
+//     }
+
+//     let stream = await mediaDevices.getUserMedia({
+//         audio: true,
+//         video: {
+//             facingMode: (isFront ? 'user' : 'environment'),
+//         },
+//     });
+//     await initJanus(stream);
+//   };
+
+//   const watchStream = () => {
+//     try {
+//       if (streaming) {
+//         console.log('streaming.watch(99)', streaming);
+//         streaming.watch(99);
+//       }
+//       // if (streaming) streaming.send({request: 'watch', id: 99});
+//       // await updateStreamsList();
+//     } catch (e) {
+//       console.error('streaming.watch', e);
+//     }
+//   }
+
+//   const updateStreamsList = async () => {
+//     if (streaming) {
+//       console.log("updateStreamsList()");
+//       await streaming.send({request: 'list'});
+//     }
+//   }
+
+//   const stopStream = async () => {
+//       if (janus) {
+//           await janus.destroy();
+//       }
+//       janus = false;
+//       streaming = false;
+//   };
+
+//   return (
+//       <View style={{flex: 1, width: '100%', height: '100%', backgroundColor: '#000000', flexDirection: 'row'}}>
+//           <>
+//             <StatusBar translucent={true} barStyle={'light-content'}/>
+//             <Button title='Start' onPress={getMediaStream} />
+//             <Button title='Watch' onPress={watchStream} />
+//             <Button title='Stop' onPress={stopStream} />
+//           </>
+//           <FlatList
+//               data={publishers}
+//               numColumns={2}
+//               keyExtractor={(item, index) => {
+//                   if (item.publisher === null) {
+//                       return `rtc-default`;
+//                   }
+//                   return `rtc-${item.publisher.id}`;
+//               }}
+//               renderItem={({item}) => (
+//                   <RTCView style={{
+//                       flex: 1,
+//                       height: (Dimensions.get('window').height / 2),
+//                   }} objectFit={'cover'} streamURL={item.stream.toURL()}/>
+//               )}
+//           />
+//       </View>
+//   );
+// }
 
 class VideoCallScreen extends React.Component {
   constructor(props) {
@@ -19,6 +143,40 @@ class VideoCallScreen extends React.Component {
           stream: null,
           publishers: [],
       };
+  }
+
+  async receivePublisher(publisher) {
+      try {
+          let videoRoom = new JanusVideoRoomPlugin(this.janus);
+          videoRoom.setRoomID(1234);
+          videoRoom.setOnStreamListener((stream) => {
+              this.setState(state => ({
+                  publishers: [
+                      ...state.publishers,
+                      {
+                          publisher: publisher,
+                          stream: stream,
+                      },
+                  ],
+              }));
+          });
+
+          await videoRoom.createPeer();
+          await videoRoom.connect();
+          await videoRoom.receive(this.videoRoom.getUserPrivateID(), publisher);
+      } catch (e) {
+          console.error(e);
+      }
+  }
+
+  async removePublisher(publisherID) {
+      try {
+          this.setState(state => ({
+              publishers: state.publishers.filter(pub => pub.publisher == null || pub.publisher.id !== publisherID),
+          }));
+      } catch (e) {
+          console.error(e);
+      }
   }
 
   async initJanus(stream) {
@@ -32,13 +190,33 @@ class VideoCallScreen extends React.Component {
               ],
           }));
 
-          this.janus = new Janus('ws://janus.4devz.com:8188');
-          // this.janus.setApiSecret('janusrocks');
+          this.janus = new Janus('wss://janus.4devz.com:8989');
+          this.janus.setApiSecret('janusrocks');
           await this.janus.init();
-          this.streaming = new JanusStreamingPlugin(this.janus);
-          await this.streaming.createPeer();
-          await this.streaming.connect();
-          // this.streaming.watch(99);
+
+          this.videoRoom = new JanusVideoRoomPlugin(this.janus);
+          this.videoRoom.setRoomID(1234);
+          this.videoRoom.setDisplayName('can');
+          this.videoRoom.setOnPublishersListener((publishers) => {
+              for (let i = 0; i < publishers.length; i++) {
+                  this.receivePublisher(publishers[i]);
+              }
+          });
+          this.videoRoom.setOnPublisherJoinedListener((publisher) => {
+              this.receivePublisher(publisher);
+          });
+          this.videoRoom.setOnPublisherLeftListener((publisherID) => {
+              this.removePublisher(publisherID);
+          });
+          this.videoRoom.setOnWebRTCUpListener(async () => {
+
+          });
+
+          await this.videoRoom.createPeer();
+          await this.videoRoom.connect();
+          await this.videoRoom.join();
+          // await this.videoRoom.publish(stream);
+
       } catch (e) {
           console.error('main', JSON.stringify(e));
       }
